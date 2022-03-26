@@ -1,0 +1,72 @@
+version: '3.9'
+# https://docs:docker:com/samples/django/:
+# https://docs.djangoproject.com/en/4.0/ref/databases/
+
+services:
+  application_db:
+    image: postgres
+    environment:
+      - POSTGRES_NAME=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./application/application_db:/var/lib/postgresql/data
+    ports:
+      - 5434:5432
+  storage_db:
+    image: postgres
+    environment:
+      - POSTGRES_NAME=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./storage/storage_db:/var/lib/postgresql/data
+    ports:
+      - 5433:5432
+  redis:
+    image: "redis:latest"
+  application:
+    build: ./application
+    command: bash -c "python manage.py createcachetable && python manage.py makemigrations products && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/application/app
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_NAME=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=application_db
+    depends_on:
+      - application_db
+      - redis
+  gateway:
+    build: ./gateway
+    command: python manage.py runserver 0.0.0.0:8001
+    volumes:
+      - .:/gateway/app
+    ports:
+      - "8001:8001"
+  storage:
+    build: ./storage
+    command: bash -c " python manage.py createcachetable && python manage.py makemigrations products && python manage.py migrate && python manage.py runserver 0.0.0.0:8002"
+    volumes:
+      - .:/storage/app
+    ports:
+      - "8002:8002"
+    environment:
+      - POSTGRES_NAME=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=storage_db
+    depends_on:
+      - storage_db
+      - redis
+  calculator:
+    build: ./calculator
+    command: python manage.py runserver 0.0.0.0:8003
+    volumes:
+      - .:/calculator/app
+    ports:
+      - "8003:8003"
+
